@@ -10,7 +10,7 @@
     "test-index": "vitest index.test",
     "test-show": "vitest show.test",
     "test-update": "vitest update.test",
-    "test-destroy": "vitest destroy.test",
+    "test-destroy": "vitest delete.test",
     "test-all": "vitest",
     "test-example": "vitest example",
     "migrate-test": "DATABASE_URL=file:./test.db prisma migrate dev --name init"

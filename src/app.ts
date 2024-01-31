@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request } from "express";
 import { prisma } from "../prisma/prisma-instance";
 import { errorHandleMiddleware } from "./error-handler";
 import "express-async-errors";
@@ -45,7 +45,7 @@ app.get("/dogs/:id", async (req, res) => {
 });
 
 app.post("/dogs", async (req, res) => {
-  const { name, description, breed, age } = req.body;
+  const bodyData = req.body;
 
   const validKeys: Record<string, string> = {
     name: "string",
@@ -54,24 +54,11 @@ app.post("/dogs", async (req, res) => {
     age: "number",
   };
 
-  const errors: string[] = [];
-
-  for (const key of Object.keys(req.body)) {
-    if (
-      !Object.prototype.hasOwnProperty.call(validKeys, key)
-    ) {
-      errors.push(`'${key}' is not a valid key`);
-    } else if (typeof req.body[key] !== validKeys[key]) {
-      errors.push(`${key} should be a ${validKeys[key]}`);
-    }
-  }
-
-  // Check for missing required keys
-  for (const key of Object.keys(validKeys)) {
-    if (req.body[key] === undefined) {
-      errors.push(`${key} should be a ${validKeys[key]}`);
-    }
-  }
+  const errors: string[] = [
+    ...validateBodyKeys(bodyData, validKeys),
+    ...missingKeys(bodyData, validKeys),
+    ...rejectInvalidKeys(bodyData, validKeys),
+  ];
 
   if (errors.length > 0) {
     return res.status(400).send({ errors: errors });
@@ -79,7 +66,7 @@ app.post("/dogs", async (req, res) => {
 
   try {
     const createDog = await prisma.dog.create({
-      data: { name, description, breed, age },
+      data: bodyData,
     });
     errors.length = 0;
 
@@ -95,6 +82,64 @@ app.post("/dogs", async (req, res) => {
   }
 });
 
+app.patch("/dogs/:id", async (req, res) => {
+  const dogId = +req.params.id;
+
+  const validKeys: Record<string, string> = {
+    name: "string",
+    description: "string",
+    breed: "string",
+    age: "number",
+  };
+
+  if (isNaN(dogId))
+    return res
+      .status(400)
+      .send({ message: "id should be a number" });
+
+  const errors = rejectInvalidKeys(req.body, validKeys);
+  if (errors.length > 0) {
+    console.error(errors);
+
+    return res.send(400).send({ errors: errors });
+  }
+  const updateDog = await Promise.resolve(
+    prisma.dog.update({
+      data: req.body,
+      where: {
+        id: dogId,
+      },
+    })
+  )
+    .catch(() => null)
+    .finally(() => (errors.length = 0));
+
+  if (updateDog === null)
+    return res
+      .status(204)
+      .send({ message: "unable to find that dog" });
+  return res.status(201).send(updateDog);
+});
+
+app.delete("/dogs/:id", async (req, res) => {
+  const dogId = +req.params.id;
+  if (isNaN(dogId))
+    return res
+      .status(400)
+      .send({ message: "id should be a number" });
+  const dog = await Promise.resolve(
+    prisma.dog.delete({
+      where: {
+        id: dogId,
+      },
+    })
+  ).catch(() => null);
+
+  if (dog === null) return res.status(204).send({});
+
+  return res.status(200).send(dog);
+});
+
 // all your code should go above this line
 app.use(errorHandleMiddleware);
 
@@ -105,3 +150,35 @@ app.listen(port, () =>
 🚀 Server ready at: http://localhost:${port}
 `)
 );
+//TODO: COME BACK AND FIX THESE ANYS
+function validateBodyKeys(body: any, validKeys: any) {
+  const errors: string[] = [];
+  for (const key of Object.keys(body)) {
+    if (typeof body[key] !== validKeys[key]) {
+      errors.push(`${key} should be a ${validKeys[key]}`);
+    }
+  }
+  return errors;
+}
+
+function missingKeys(body: any, validKeys: any) {
+  // Check for missing required keys
+  const errors: string[] = [];
+  for (const key of Object.keys(validKeys)) {
+    if (body[key] === undefined) {
+      errors.push(`${key} should be a ${validKeys[key]}`);
+    }
+  }
+  return errors;
+}
+function rejectInvalidKeys(body: any, validKeys: any) {
+  const errors: string[] = [];
+  for (const key of Object.keys(body)) {
+    if (
+      !Object.prototype.hasOwnProperty.call(validKeys, key)
+    ) {
+      errors.push(`'${key}' is not a valid key`);
+    }
+  }
+  return errors;
+}
