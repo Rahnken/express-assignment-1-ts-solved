@@ -1,4 +1,4 @@
-import express, { Request } from "express";
+import express from "express";
 import { prisma } from "../prisma/prisma-instance";
 import { errorHandleMiddleware } from "./error-handler";
 import "express-async-errors";
@@ -8,7 +8,7 @@ app.use(express.json());
 // All code should go below this line
 
 app.get("/", (_req, res) => {
-  res.json({ message: "Hello World!" }).status(200);
+  return res.json({ message: "Hello World!" }).status(200);
 });
 
 app.get("/dogs", async (req, res) => {
@@ -18,7 +18,7 @@ app.get("/dogs", async (req, res) => {
     return res.send(
       `<h1> No Dogs Found, Please create one </h1>`
     );
-  return res.send(dogs).status(200);
+  return res.status(200).send(dogs);
 });
 
 app.get("/dogs/:id", async (req, res) => {
@@ -41,7 +41,7 @@ app.get("/dogs/:id", async (req, res) => {
     return res.status(204).send({
       message: "unable to find dog with that id",
     });
-  return res.send(dog).status(200);
+  return res.status(200).send(dog);
 });
 
 app.post("/dogs", async (req, res) => {
@@ -98,11 +98,8 @@ app.patch("/dogs/:id", async (req, res) => {
       .send({ message: "id should be a number" });
 
   const errors = rejectInvalidKeys(req.body, validKeys);
-  if (errors.length > 0) {
-    console.error(errors);
-
-    return res.send(400).send({ errors: errors });
-  }
+  if (errors.length > 0) return res.status(400).send({ errors: errors });
+  
   const updateDog = await Promise.resolve(
     prisma.dog.update({
       data: req.body,
@@ -151,7 +148,10 @@ app.listen(port, () =>
 `)
 );
 //TODO: COME BACK AND FIX THESE ANYS
-function validateBodyKeys(body: any, validKeys: any) {
+function validateBodyKeys(
+  body: Record<string, unknown>,
+  validKeys: Record<string, unknown>
+) {
   const errors: string[] = [];
   for (const key of Object.keys(body)) {
     if (typeof body[key] !== validKeys[key]) {
@@ -161,7 +161,10 @@ function validateBodyKeys(body: any, validKeys: any) {
   return errors;
 }
 
-function missingKeys(body: any, validKeys: any) {
+function missingKeys(
+  body: Record<string, unknown>,
+  validKeys: Record<string, unknown>
+) {
   // Check for missing required keys
   const errors: string[] = [];
   for (const key of Object.keys(validKeys)) {
@@ -171,7 +174,10 @@ function missingKeys(body: any, validKeys: any) {
   }
   return errors;
 }
-function rejectInvalidKeys(body: any, validKeys: any) {
+function rejectInvalidKeys(
+  body: Record<string, unknown>,
+  validKeys: Record<string, unknown>
+) {
   const errors: string[] = [];
   for (const key of Object.keys(body)) {
     if (
